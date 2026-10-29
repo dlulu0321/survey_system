@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block title %}问卷不可填写{% endblock %}{% block content %}<section class="panel narrow"><h1>当前问卷不可填写</h1><p>“{{ survey.title }}”尚未发布、已关闭或已超过截止时间。</p><a href="{{ url_for('index') }}">返回首页</a></section>{% endblock %}

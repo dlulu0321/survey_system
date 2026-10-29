@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}题目版本与统计{% endblock %}
+{% block content %}
+<section class="panel">
+  <p><a href="{{ url_for('question_bank_home', survey_id=survey_id or None) }}">← 返回题库</a></p>
+  <h1>{{ family.title }}</h1>
+  <p>题目系列 ID：<code>{{ family._id }}</code></p>
+  <p class="hint">版本记录为不可变记录。恢复旧版本会新增一个版本，不会覆盖历史数据。</p>
+  {% if survey_id %}<div class="message success">正在选择题目加入草稿问卷。你可以在下方为不同问卷选择不同版本。</div>{% endif %}
+</section>
+<section class="panel">
+  <h2>版本历史</h2>
+  {% for version in versions %}
+    <article class="question-bank-row">
+      <div>
+        <h3>v{{ version.version }}{% if loop.first %} <span class="status">最新</span>{% endif %}</h3>
+        <p>{{ version.definition.title }} · 类型：{{ version.definition.type }}</p>
+        <p class="hint">创建时间：{{ version.created_at.strftime('%Y-%m-%d %H:%M UTC') }} · 说明：{{ version.change_note }}</p>
+        <p class="hint">父版本：{% if version.parent_version_id %}v{{ version.parent_version_number }}（ID：{{ version.parent_version_id }}）{% else %}初始版本{% endif %}</p>
+        <details><summary>查看完整题目配置</summary><pre>{{ version.definition | tojson(indent=2) }}</pre></details>
+      </div>
+      <div class="stack">
+        {% if survey_id %}<form method="post" action="{{ url_for('survey_add_library_question', survey_id=survey_id, version_id=version._id) }}"><button class="button" type="submit">将 v{{ version.version }} 加入问卷</button></form>{% endif %}
+        {% if owner and not loop.first %}<form method="post" action="{{ url_for('question_family_restore', family_id=family._id, version_id=version._id) }}" onsubmit="return confirm('将以该版本内容创建一个新的恢复版本，不会覆盖已有版本。继续吗？')"><button class="button secondary" type="submit">恢复此版本为新版本</button></form>{% endif %}
+      </div>
+    </article>
+  {% endfor %}
+</section>
+{% if owner and latest %}
+<section class="panel">
+  <h2>创建新版本</h2>
+  <p>编辑下面的 JSON 并提交，会在最新版本基础上创建新版本。已有问卷里的题目快照不会改变。</p>
+  <form method="post" action="{{ url_for('question_family_new_version', family_id=family._id, version_id=latest._id) }}">
+    <label>修改说明<input name="change_note" maxlength="200" placeholder="例如：调整年龄范围或修改题目表述"></label>
+    <label>新版本题目 JSON<textarea class="code-input" name="question_json" rows="10" required spellcheck="false">{{ latest_definition_json }}</textarea></label>
+    <button class="button" type="submit">创建下一个版本</button>
+  </form>
+</section>
+<section class="panel">
+  <h2>分享题目</h2>
+  <p>输入已注册用户的用户名。对方可以查看并使用这些版本，但不能修改你的版本历史。</p>
+  <form method="post" action="{{ url_for('question_family_share', family_id=family._id) }}" class="inline-form">
+    <label>共享给用户名<input name="username" required></label>
+    <button class="button" type="submit">共享题目</button>
+  </form>
+</section>
+{% endif %}
+<section class="panel">
+  <h2>哪些问卷使用了这个题目</h2>
+  {% for item in usage %}
+    <p><strong>{{ item.survey.title }}</strong> · 状态：{{ {'draft':'草稿','published':'已发布','closed':'已关闭'}.get(item.survey.status,item.survey.status) }} · 所用版本：v{{ item.question.source_question_version or '旧数据' }} · 题目：{{ item.question.title }}</p>
+  {% else %}<p>当前还没有问卷引用这个题目系列。</p>{% endfor %}
+</section>
+<section class="panel">
+  <h2>跨问卷统计</h2>
+  {% if owner %}<p>该统计汇总所有引用本题目系列的问卷回答。不同版本会同时统计；若题型含义发生改变，建议结合下面的版本分项阅读。</p>{% else %}<p>你是该题目的共享使用者。为保护其他用户的问卷数据，此处只汇总你自己创建的问卷中该题目的回答。</p>{% endif %}
+  <div class="grid">
+    <article class="card"><h3>有效回答数</h3><p class="metric">{{ stats.response_count }}</p></article>
+    <article class="card"><h3>数字答案数</h3><p class="metric">{{ stats.numeric_count }}</p></article>
+    {% if stats.numeric_average is not none %}<article class="card"><h3>数字平均值</h3><p class="metric">{{ '%.2f'|format(stats.numeric_average) }}</p></article>{% endif %}
+  </div>
+  {% if stats.numeric_count %}<p>数字范围：{{ stats.numeric_min }} ～ {{ stats.numeric_max }}</p>{% endif %}
+  {% if stats.option_counts %}<h3>选项计数</h3><table><thead><tr><th>选项</th><th>选择次数</th></tr></thead><tbody>{% for option, count in stats.option_counts.items() %}<tr><td>{{ option }}</td><td>{{ count }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+  <h3>按版本统计</h3>
+  {% for item in version_stats %}
+    <article class="card"><h4>v{{ item.version }}：{{ item.title }}（{{ item.type }}）</h4><p>有效回答：{{ item.response_count }}</p>
+      {% if item.numeric_count %}<p>数字样本：{{ item.numeric_count }}；平均值：{{ '%.2f'|format(item.numeric_average) }}；范围：{{ item.numeric_min }} ～ {{ item.numeric_max }}</p>{% endif %}
+      {% if item.option_counts %}<p>选项计数：{% for option,count in item.option_counts.items() %}{{ option }}={{ count }}{% if not loop.last %}；{% endif %}{% endfor %}</p>{% endif %}
+      {% if item.text_sample %}<details><summary>查看部分文本回答</summary><ul>{% for answer in item.text_sample %}<li>{{ answer }}</li>{% endfor %}</ul></details>{% endif %}
+    </article>
+  {% else %}<p>暂时没有可统计的回答。</p>{% endfor %}
+</section>
+{% endblock %}

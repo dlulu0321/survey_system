@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block title %}题库管理{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>题库管理</h1>
+  <p>保存可复用的题目。题目每次修改都会生成一个新版本；已经加入问卷的题目保存为独立快照，后续修改题库不会反向修改问卷。</p>
+  {% if target_survey %}<div class="message success">当前目标问卷：{{ target_survey.title }}。点击题目旁的“加入问卷”即可把所选版本加入该草稿。</div>{% endif %}
+  <h2>我的题库</h2>
+  <div class="grid">
+    {% for bank in banks %}
+      <article class="card"><h3>{{ bank.name }}</h3><p>{{ bank.description }}</p><p class="hint">版本条目数：{{ bank.item_count }}</p>{% for item in bank['items'] %}<div class="bank-item"><a href="{{ url_for('question_family_detail', family_id=item.family._id, survey_id=survey_id or None) }}">{{ item.version.definition.title }}（v{{ item.version.version }}）</a><form method="post" action="{{ url_for('question_bank_remove_item', bank_id=bank._id, version_id=item.version._id) }}"><button class="text-danger" type="submit">移除</button></form></div>{% endfor %}{% if bank.name != '我的题库' %}<form method="post" action="{{ url_for('question_bank_delete_bank', bank_id=bank._id) }}" onsubmit="return confirm('删除此题库？题目本身不会被删除。')"><button class="text-danger" type="submit">删除此题库</button></form>{% endif %}</article>
+    {% else %}<p>暂无题库。</p>{% endfor %}
+  </div>
+  <form method="post" action="{{ url_for('question_bank_create_bank') }}" class="inline-form">
+    <label>新题库名称<input name="name" maxlength="80" required placeholder="例如：课程调查题库"></label>
+    <label>说明<input name="description" placeholder="可选"></label>
+    <button class="button secondary" type="submit">创建题库</button>
+  </form>
+</section>
+<section class="panel">
+  <h2>新建并保存常用题目</h2>
+  <p class="hint">输入单道题目的 JSON。题目跳转规则依赖所在问卷的其他题目，因此题库模板不保存 jump_rules；加入问卷后再设置跳转。</p>
+  <form method="post" action="{{ url_for('question_bank_create_question') }}">
+    <label>题目 JSON<textarea class="code-input" name="question_json" rows="10" required spellcheck="false">{
+  "title": "你的年龄？",
+  "type": "number",
+  "required": true,
+  "min_value": 0,
+  "max_value": 120,
+  "integer_only": true
+}</textarea></label>
+    <button class="button" type="submit">保存为题库题目（v1）</button>
+  </form>
+</section>
+<section class="panel">
+  <h2>可使用的题目版本</h2>
+  {% for entry in entries %}
+    <article class="question-bank-row">
+      <div>
+        <h3>{{ entry.family.title }} <span class="status">v{{ entry.version.version }}</span></h3>
+        <p>{{ entry.version.definition.type }} · {{ '自己创建' if entry.is_owner else '他人共享' }}</p>
+        <p class="hint">{{ entry.version.definition.title }}</p>
+        <a href="{{ url_for('question_family_detail', family_id=entry.family._id, survey_id=survey_id or None) }}">查看版本历史、使用情况和跨问卷统计</a>
+      </div>
+      <div class="stack">
+        {% if survey_id %}
+          <form method="post" action="{{ url_for('survey_add_library_question', survey_id=survey_id, version_id=entry.version._id) }}"><button class="button" type="submit">加入问卷</button></form>
+        {% endif %}
+        <form method="post" action="{{ url_for('question_bank_add_item', version_id=entry.version._id) }}">
+          <label>加入题库<select name="bank_id" required>{% for bank in banks %}<option value="{{ bank._id }}">{{ bank.name }}</option>{% endfor %}</select></label>
+          <button class="button secondary" type="submit">添加版本</button>
+        </form>
+      </div>
+    </article>
+  {% else %}<p>题库目前没有可用题目。可以先在上方创建一个题目。</p>{% endfor %}
+</section>
+{% endblock %}

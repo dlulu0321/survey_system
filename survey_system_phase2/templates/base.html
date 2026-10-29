@@ -1,0 +1,5 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{% block title %}问卷系统{% endblock %}</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><header><a class="brand" href="{{ url_for('index') }}">Mongo 问卷系统</a><nav>{% if session.get('user_id') %}<a href="{{ url_for('dashboard') }}">我的问卷</a><a href="{{ url_for('question_bank_home') }}">题库管理</a><form class="inline" action="{{ url_for('logout') }}" method="post"><button class="link-button">退出</button></form>{% else %}<a href="{{ url_for('login') }}">登录</a><a href="{{ url_for('register') }}">注册</a>{% endif %}</nav></header><main>
+{% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<section class="messages">{% for category, message in messages %}<div class="message {{ category }}">{{ message }}</div>{% endfor %}</section>{% endif %}{% endwith %}
+{% block content %}{% endblock %}</main><footer>课程大作业 · 第二阶段版本化题库原型</footer></body></html>

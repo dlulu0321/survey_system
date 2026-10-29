@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}{{ '新建问卷' if not survey else '编辑问卷' }}{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>{{ '新建问卷' if not survey else '编辑问卷' }}</h1>
+  {% if survey %}
+    <p>状态：<span class="status {{ survey.status }}">{{ {'draft':'草稿','published':'已发布','closed':'已关闭'}.get(survey.status,survey.status) }}</span> · 公共链接：<code>{{ url_for('survey_public', public_id=survey.public_id, _external=True) }}</code></p>
+    {% if survey.status == 'published' %}
+      <div class="message error">该问卷已发布，题目内容已冻结。若需要修改题目，请复制为草稿；原问卷的题目快照和收集的数据会保持不变。</div>
+      <form method="post" action="{{ url_for('survey_copy_draft', survey_id=survey._id) }}"><button class="button" type="submit">复制为草稿并修改题目</button></form>
+    {% elif survey.status == 'closed' %}
+      <div class="message error">该问卷已关闭，不能修改。</div>
+    {% else %}
+      <p><a class="button secondary" href="{{ url_for('question_bank_home', survey_id=survey._id) }}">从题库选择题目</a></p>
+    {% endif %}
+  {% endif %}
+  <form method="post" action="{{ url_for('survey_create') if not survey else url_for('survey_edit_post', survey_id=survey._id) }}">
+    <label>问卷标题<input name="title" required maxlength="120" value="{{ survey.title if survey else '' }}" {% if survey and survey.status == 'closed' %}disabled{% endif %}></label>
+    <label>问卷说明<textarea name="description" rows="3" {% if survey and survey.status == 'closed' %}disabled{% endif %}>{{ survey.description if survey else '' }}</textarea></label>
+    <label class="checkbox"><input type="checkbox" name="allow_anonymous" {% if survey and survey.allow_anonymous %}checked{% endif %} {% if survey and survey.status != 'draft' %}disabled{% endif %}> 允许匿名填写（允许未登录用户提交）</label>
+    {% if survey %}
+      <label>题目配置（JSON）<textarea class="code-input" name="questions_json" rows="24" spellcheck="false" required {% if survey.status != 'draft' %}readonly{% endif %}>{{ sample_questions }}</textarea></label>
+      <p class="hint">每道题需要 id、title、type、required。type 可选 single、multiple、text、number。跳转规则写在 jump_rules 数组中。已发布问卷的题目配置只读；请复制为草稿后修改。</p>
+    {% endif %}
+    {% if not survey or survey.status == 'draft' %}<button class="button" type="submit">{{ '创建问卷' if not survey else '保存问卷与题目' }}</button>{% elif survey.status == 'published' %}<button class="button" type="submit">保存问卷基本信息（题目不可改）</button>{% endif %}
+  </form>
+  {% if survey and survey.status == 'draft' %}<form class="publish-form" method="post" action="{{ url_for('survey_publish', survey_id=survey._id) }}"><label>截止时间（可选）<input type="datetime-local" name="deadline"></label><button class="button secondary" type="submit">发布问卷</button></form>{% endif %}
+  {% if survey %}<p><a href="{{ url_for('dashboard') }}">返回问卷列表</a> · <a href="{{ url_for('survey_stats', survey_id=survey._id) }}">查看问卷统计</a> · <a href="{{ url_for('question_bank_home') }}">题库管理</a></p>{% endif %}
+</section>
+{% endblock %}
